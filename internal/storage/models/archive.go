@@ -3,10 +3,10 @@ package models
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"path"
 	"strings"
 
+	"github.com/ddvk/rmfakecloud/internal/storage"
 	"github.com/ddvk/rmfakecloud/internal/storage/exporter"
 	"github.com/juruen/rmapi/archive"
 	"github.com/juruen/rmapi/encoding/rm"
@@ -27,13 +27,13 @@ func ArchiveFromHashDoc(doc *HashDoc, rs RemoteStorage) (*exporter.MyArchive, er
 		filext := path.Ext(f.EntryName)
 		name := strings.TrimSuffix(path.Base(f.EntryName), filext)
 		switch filext {
-		case ContentFileExt:
+		case storage.ContentFileExt:
 			blob, err := rs.GetReader(f.Hash)
 			if err != nil {
 				return nil, err
 			}
 			defer blob.Close()
-			contentBytes, err := ioutil.ReadAll(blob)
+			contentBytes, err := io.ReadAll(blob)
 			if err != nil {
 				return nil, err
 			}
@@ -41,9 +41,9 @@ func ArchiveFromHashDoc(doc *HashDoc, rs RemoteStorage) (*exporter.MyArchive, er
 			if err != nil {
 				return nil, err
 			}
-		case EpubFileExt:
+		case storage.EpubFileExt:
 			fallthrough
-		case PdfFileExt:
+		case storage.PdfFileExt:
 			blob, err := rs.GetReader(f.Hash)
 			if err != nil {
 				return nil, err
@@ -59,7 +59,7 @@ func ArchiveFromHashDoc(doc *HashDoc, rs RemoteStorage) (*exporter.MyArchive, er
 
 		case ".json":
 			//metadata
-		case RmFileExt:
+		case storage.RmFileExt:
 			log.Debug("adding page ", name)
 			pageMap[name] = f.Hash
 		}
@@ -72,7 +72,7 @@ func ArchiveFromHashDoc(doc *HashDoc, rs RemoteStorage) (*exporter.MyArchive, er
 			if err != nil {
 				return nil, err
 			}
-			pageBin, err := ioutil.ReadAll(reader)
+			pageBin, err := io.ReadAll(reader)
 			if err != nil {
 				return nil, err
 			}

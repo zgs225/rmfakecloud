@@ -14,6 +14,7 @@ RUN go generate ./... && CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=
 
 FROM alpine
 EXPOSE 3000
+ADD ./docker/rootfs.tar /
 COPY --from=gobuilder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=gobuilder /src/rmfakecloud-docker /
 CMD ["/rmfakecloud-docker"]

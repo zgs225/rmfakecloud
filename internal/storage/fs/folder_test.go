@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ddvk/rmfakecloud/internal/config"
-	"github.com/ddvk/rmfakecloud/internal/storage/models"
+	"github.com/ddvk/rmfakecloud/internal/storage"
 )
 
 func TestFileCreateFolder_CreateFolder(t *testing.T) {
@@ -37,12 +37,12 @@ func TestFileCreateFolder_CreateFolder(t *testing.T) {
 		t.Error("document should not be nil")
 	}
 
-	_, err = os.Stat(path.Join(userdir, doc.ID+models.MetadataFileExt))
+	_, err = os.Stat(path.Join(userdir, doc.ID+storage.MetadataFileExt))
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = os.Stat(path.Join(userdir, doc.ID+models.ZipFileExt))
+	_, err = os.Stat(path.Join(userdir, doc.ID+storage.ZipFileExt))
 	if err != nil {
 		t.Error(err)
 	}

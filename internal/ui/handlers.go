@@ -10,7 +10,9 @@ import (
 
 	"github.com/ddvk/rmfakecloud/internal/app/hub"
 	"github.com/ddvk/rmfakecloud/internal/common"
+	"github.com/ddvk/rmfakecloud/internal/messages"
 	"github.com/ddvk/rmfakecloud/internal/model"
+	"github.com/ddvk/rmfakecloud/internal/storage"
 	"github.com/ddvk/rmfakecloud/internal/ui/viewmodel"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
@@ -24,6 +26,7 @@ const (
 	isSync15Key         = "sync15"
 	docIDParam          = "docid"
 	uiLogger            = "[ui] "
+	ui10                = " [10] "
 	useridParam         = "userid"
 	cookieName          = ".Authrmfakecloud"
 )
@@ -225,20 +228,23 @@ func (app *ReactAppWrapper) newCode(c *gin.Context) {
 	c.JSON(http.StatusOK, code)
 }
 
-func getBackend(c *gin.Context) backend {
-	blah, ok := c.Get("backend")
+func (app *ReactAppWrapper) getBackend(c *gin.Context) backend {
+	s, ok := c.Get(backendVersionKey)
 	if !ok {
-		panic("not there")
+		panic("key not set")
 	}
-	return blah.(backend)
-
+	backend, ok := app.backends[s.(common.SyncVersion)]
+	if !ok {
+		panic("backend not found")
+	}
+	return backend
 }
 func (app *ReactAppWrapper) listDocuments(c *gin.Context) {
 	uid := c.GetString(userIDContextKey)
 
 	var tree *viewmodel.DocumentTree
 
-	backend := getBackend(c)
+	backend := app.getBackend(c)
 	tree, err := backend.GetDocumentTree(uid)
 	if err != nil {
 		log.Error(err)
@@ -250,17 +256,23 @@ func (app *ReactAppWrapper) listDocuments(c *gin.Context) {
 func (app *ReactAppWrapper) getDocument(c *gin.Context) {
 	uid := c.GetString(userIDContextKey)
 	docid := common.ParamS(docIDParam, c)
+
+	exportType := "pdf"
+	var exportOption storage.ExportOption = 0
+
 	log.Info("exporting ", docid)
 
-	metadata, err := app.metadataStore.GetMetadata(uid, docid)
+	// TODO(jxg): `users/xendke/6886952c-2b58-4fd6-9960-f08f1327b19c.metadata: no such file or directory`
+	// metadata, err := app.metadataStore.GetMetadata(uid, docid)
 
-	if err != nil {
-		badReq(c, err.Error())
-		return
-	}
+	// if err != nil {
+	// 	badReq(c, err.Error())
+	// 	return
+	// }
 
-	backend := getBackend(c)
-	reader, err := backend.Export(uid, docid, "pdf", 0)
+	backend := app.getBackend(c)
+
+	reader, err := backend.Export(uid, docid, exportType, exportOption)
 	if err != nil {
 		log.Error(err)
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -287,7 +299,7 @@ func (app *ReactAppWrapper) getDocument(c *gin.Context) {
 		return
 	}
 
-	c.FileAttachment(tmpFile.Name(), metadata.VissibleName+".pdf")
+	c.FileAttachment(tmpFile.Name(), docid+".pdf")
 }
 
 func (app *ReactAppWrapper) getDocumentMetadata(c *gin.Context) {
@@ -307,6 +319,7 @@ func (app *ReactAppWrapper) getDocumentMetadata(c *gin.Context) {
 	c.JSON(http.StatusOK, metadata)
 }
 
+// move rename
 func (app *ReactAppWrapper) updateDocument(c *gin.Context) {
 	upd := viewmodel.UpdateDoc{}
 	if err := c.ShouldBindJSON(&upd); err != nil {
@@ -316,7 +329,7 @@ func (app *ReactAppWrapper) updateDocument(c *gin.Context) {
 	}
 	uid := c.GetString(userIDContextKey)
 	docid := common.ParamS(docIDParam, c)
-	backend := getBackend(c)
+	backend := app.getBackend(c)
 
 	dirty := false
 
@@ -357,31 +370,58 @@ func (app *ReactAppWrapper) updateDocument(c *gin.Context) {
 		log.Info(uiLogger, "document updated: id=", docid)
 	}
 
+	// TODO(jxg): old implementation should we keep as separate handler? 
+// 	backend := app.getBackend(c)
+// 	uid := c.GetString(userIDContextKey)
+// 	log.Info(uiLogger, ui10, "updatedoc")
+// 	err := backend.UpdateDocument(uid, upd.DocumentID, upd.Name, upd.ParentID)
+// 	if err != nil {
+// 		badReq(c, err.Error())
+// 		return
+// 	}
+
 	c.Status(http.StatusOK)
 }
 
 func (app *ReactAppWrapper) deleteDocument(c *gin.Context) {
 	uid := c.GetString(userIDContextKey)
-	docId := common.ParamS(docIDParam, c)
-	backend := getBackend(c)
-	err := backend.DeleteDocument(uid, docId)
+	docid := c.Param("docid")
+	backend := app.getBackend(c)
 
+	err := backend.DeleteDocument(uid, docid)
 	if err != nil {
-		log.Error("Delete document error: ", err)
 		badReq(c, err.Error())
-		return
 	}
-
 	backend.Sync(uid)
-
 	c.Status(http.StatusOK)
 }
+
+// TODO(jxg): old implementation, remove?
+// func (app *ReactAppWrapper) createFolder(c *gin.Context) {
+// 	upd := viewmodel.NewFolder{}
+// 	if err := c.ShouldBindJSON(&upd); err != nil {
+// 		log.Error(err)
+// 		badReq(c, err.Error())
+// 		return
+// 	}
+// 	uid := c.GetString(userIDContextKey)
+
+// 	backend := app.getBackend(c)
+
+// 	doc, err := backend.CreateFolder(uid, upd.Name, upd.ParentID)
+// 	if err != nil {
+// 		log.Error(err)
+// 		c.AbortWithStatus(http.StatusInternalServerError)
+// 		return
+// 	}
+// 	c.JSON(http.StatusOK, doc)
+// }
+
 func (app *ReactAppWrapper) createDocument(c *gin.Context) {
 	uid := c.GetString(userIDContextKey)
-	_ = c.GetBool(isSync15Key)
 	log.Info("uploading documents from: ", uid)
 
-	backend := getBackend(c)
+	backend := app.getBackend(c)
 
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -395,6 +435,7 @@ func (app *ReactAppWrapper) createDocument(c *gin.Context) {
 	}
 	log.Info("Parent: " + parentID)
 
+	docs := []*storage.Document{}
 	for _, file := range form.File["file"] {
 		f, err := file.Open()
 		if err != nil {
@@ -407,15 +448,16 @@ func (app *ReactAppWrapper) createDocument(c *gin.Context) {
 		//do the stuff
 		log.Info(uiLogger, fmt.Sprintf("Uploading %s , size: %d", file.Filename, file.Size))
 
-		_, err = backend.CreateDocument(uid, file.Filename, parentID, f)
+		doc, err := backend.CreateDocument(uid, file.Filename, parentID, f)
 		if err != nil {
 			log.Error(err)
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
+		docs = append(docs, doc)
 	}
 	backend.Sync(uid)
-	c.Status(http.StatusOK)
+	c.JSON(http.StatusOK, docs)
 }
 
 func (app *ReactAppWrapper) getAppUsers(c *gin.Context) {
@@ -604,7 +646,7 @@ func (app *ReactAppWrapper) createFolder(c *gin.Context) {
 
 	uid := c.GetString(userIDContextKey)
 
-	backend := getBackend(c)
+	backend := app.getBackend(c)
 
 	doc, err := backend.CreateFolder(uid, req.Name, req.ParentID)
 
@@ -620,7 +662,7 @@ func (app *ReactAppWrapper) createFolder(c *gin.Context) {
 		Version: doc.Version,
 		Parent:  doc.Parent,
 		Name:    doc.Name,
-	}, hub.DocAddedEvent)
+	}, messages.DocAddedEvent)
 
 	c.JSON(http.StatusOK, gin.H{
 		"id":      doc.ID,

@@ -18,7 +18,7 @@ export interface HashDoc {
   extension?: string
   parent?: string
   children?: HashDoc[]
-  LastModified: string
+  lastModified: string
 
   preMode?: HashDocMode
   mode?: HashDocMode

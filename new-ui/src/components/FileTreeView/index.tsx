@@ -420,7 +420,7 @@ export default function FileTreeView({ reloadCnt }: { reloadCnt?: number }) {
                     ? breadcrumbItems[breadcrumbItems.length - 1].id
                     : undefined,
                 size: 0,
-                LastModified: '',
+                lastModified: '',
                 mode: 'creating'
               }
 

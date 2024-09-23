@@ -26,7 +26,6 @@ interface PageInfo {
 export default function DocumentViewer() {
   const { docId } = useParams()
   const { t } = useTranslation()
-  const [metadata, setMetadata] = useState<HashDocMetadata | null>(null)
   const [isDocNotFound, setIsDocNotFound] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const { width: windowWidth } = useWindowDimensions()
@@ -73,25 +72,26 @@ export default function DocumentViewer() {
       return
     }
 
-    getMetadata(docId)
-      .then((response) => {
-        const md = response.data as HashDocMetadata
+    // TODO(jxg): metadata 404 same as download/export
+    // getMetadata(docId)
+    //   .then((response) => {
+    //     const md = response.data as HashDocMetadata
 
-        if (!md) {
-          setIsDocNotFound(true)
+    //     if (!md) {
+    //       setIsDocNotFound(true)
 
-          return false
-        }
+    //       return false
+    //     }
 
-        setMetadata(md)
+    //     setMetadata(md)
 
-        return true
-      })
-      .catch((err: AxiosError) => {
-        if (err.response && err.response.status === StatusCodes.NOT_FOUND) {
-          setIsDocNotFound(true)
-        }
-      })
+    //     return true
+    //   })
+    //   .catch((err: AxiosError) => {
+    //     if (err.response && err.response.status === StatusCodes.NOT_FOUND) {
+    //       setIsDocNotFound(true)
+    //     }
+    //   })
   }, [docId])
 
   return isDocNotFound ? (
@@ -102,7 +102,7 @@ export default function DocumentViewer() {
   ) : (
     <>
       <Helmet>
-        <title>{fullSiteTitle(metadata?.VissibleName)}</title>
+        <title>{'test'}</title>
       </Helmet>
       <Document
         className={`mx-auto px-4 ${isLoadingDocument ? 'flex items-center' : ''}`}

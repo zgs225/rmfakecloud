@@ -28,7 +28,7 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         {
-          src: 'node_modules/pdfjs-dist/build/pdf.worker.min.js',
+          src: 'node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.js',
           dest: 'lib/'
         },
         {

@@ -2,13 +2,13 @@ package fs
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/ddvk/rmfakecloud/internal/messages"
-	"github.com/ddvk/rmfakecloud/internal/storage/models"
+	"github.com/ddvk/rmfakecloud/internal/storage"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -16,14 +16,14 @@ import (
 func (fs *FileSystemStorage) GetAllMetadata(uid string) (result []*messages.RawMetadata, err error) {
 	result = []*messages.RawMetadata{}
 
-	var files []os.FileInfo
+	// var files []os.FileInfo
 	folder := fs.getUserPath(uid)
-	files, err = ioutil.ReadDir(folder)
+	files, err := os.ReadDir(folder)
 
 	for _, f := range files {
 		ext := filepath.Ext(f.Name())
 		id := strings.TrimSuffix(f.Name(), ext)
-		if ext != models.MetadataFileExt {
+		if ext != storage.MetadataFileExt {
 			continue
 		}
 		doc, err := fs.GetMetadata(uid, id)
@@ -39,13 +39,13 @@ func (fs *FileSystemStorage) GetAllMetadata(uid string) (result []*messages.RawM
 
 // GetMetadata loads a document's metadata
 func (fs *FileSystemStorage) GetMetadata(uid, id string) (*messages.RawMetadata, error) {
-	fullPath := fs.getPathFromUser(uid, id+models.MetadataFileExt)
+	fullPath := fs.getPathFromUser(uid, id+storage.MetadataFileExt)
 	f, err := os.Open(fullPath)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	content, err := ioutil.ReadAll(f)
+	content, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
@@ -62,13 +62,12 @@ func (fs *FileSystemStorage) GetMetadata(uid, id string) (*messages.RawMetadata,
 
 // UpdateMetadata updates the metadata of a document
 func (fs *FileSystemStorage) UpdateMetadata(uid string, r *messages.RawMetadata) error {
-	filepath := fs.getPathFromUser(uid, r.ID+models.MetadataFileExt)
+	filepath := fs.getPathFromUser(uid, r.ID+storage.MetadataFileExt)
 
 	js, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(filepath, js, 0600)
+	err = os.WriteFile(filepath, js, 0600)
 	return err
-
 }

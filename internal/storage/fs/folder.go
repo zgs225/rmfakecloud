@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ddvk/rmfakecloud/internal/common"
 	"github.com/ddvk/rmfakecloud/internal/messages"
 	"github.com/ddvk/rmfakecloud/internal/storage"
-	"github.com/ddvk/rmfakecloud/internal/storage/models"
 	"github.com/google/uuid"
 )
 
@@ -17,7 +17,7 @@ func (fs *FileSystemStorage) CreateFolder(uid, name, parentID string) (*storage.
 	docID := uuid.New().String()
 
 	// Create zip file
-	zipFilePath := fs.getPathFromUser(uid, docID+models.ZipFileExt)
+	zipFilePath := fs.getPathFromUser(uid, docID+storage.ZipFileExt)
 
 	zipFile, err := os.Create(zipFilePath)
 	if err != nil {
@@ -28,14 +28,14 @@ func (fs *FileSystemStorage) CreateFolder(uid, name, parentID string) (*storage.
 	zipWriter := zip.NewWriter(zipFile)
 	defer zipWriter.Close()
 
-	contentEntry, err := zipWriter.Create(docID + models.ContentFileExt)
+	contentEntry, err := zipWriter.Create(docID + storage.ContentFileExt)
 	if err != nil {
 		return nil, err
 	}
 	contentEntry.Write([]byte(`{"tags":[]}`))
 
 	// Create metadata file
-	mdFilePath := fs.getPathFromUser(uid, docID+models.MetadataFileExt)
+	mdFilePath := fs.getPathFromUser(uid, docID+storage.MetadataFileExt)
 
 	mdFile, err := os.Create(mdFilePath)
 	if err != nil {
@@ -49,7 +49,7 @@ func (fs *FileSystemStorage) CreateFolder(uid, name, parentID string) (*storage.
 		Parent:         parentID,
 		Version:        1,
 		ModifiedClient: time.Now().UTC().Format(time.RFC3339Nano),
-		Type:           models.CollectionType,
+		Type:           common.CollectionType,
 	}
 
 	if err = json.NewEncoder(mdFile).Encode(md); err != nil {

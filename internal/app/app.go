@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"net/url"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -22,8 +23,6 @@ const (
 	userIDKey      = "UserID"
 	deviceIDKey    = "DeviceID"
 	syncVersionKey = "SyncVersion"
-	Version10      = 10
-	Version15      = 15
 )
 
 // App web app
@@ -43,8 +42,8 @@ type App struct {
 // Start starts the app
 func (app *App) Start() {
 	// configs
-	log.Info("The device should use this storage URL: ", app.cfg.StorageURL, " Override with: ", config.EnvStorageURL)
-	log.Info("Documents will be saved in: ", app.cfg.DataDir)
+	log.Info(config.EnvStorageURL, " (Cloud URL): ", app.cfg.StorageURL)
+	log.Info("Data: ", app.cfg.DataDir)
 	log.Info("Listening on port: ", app.cfg.Port)
 
 	var tlsConfig *tls.Config
@@ -86,6 +85,15 @@ func (app *App) Stop() {
 	if err := app.srv.Shutdown(ctx); err != nil {
 		log.Fatal("Server Shutdown:", err)
 	}
+}
+
+func (app *App) MyEndpoint() (string, error) {
+	u, err := url.Parse(app.cfg.StorageURL)
+	if err != nil {
+		return "", err
+	}
+
+	return u.Host, nil
 }
 
 // NewApp constructs an app
@@ -143,13 +151,14 @@ func NewApp(cfg *config.Config) App {
 		},
 	}
 
+	app.registerRoutes(router)
+
 	uiApp := ui.New(cfg, fsStorage, codeConnector, ntfHub, fsStorage, fsStorage, fsStorage)
+	uiApp.RegisterRoutes(router)
 
 	storageapp := fs.NewApp(cfg, fsStorage)
-
-	app.registerRoutes(router)
 	storageapp.RegisterRoutes(router)
-	uiApp.RegisterRoutes(router)
+
 	return app
 }
 

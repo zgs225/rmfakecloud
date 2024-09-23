@@ -102,7 +102,7 @@ export default function DocumentViewer() {
   ) : (
     <>
       <Helmet>
-        <title>{fullSiteTitle(metadata?.VissibleName)}</title>
+        <title>{fullSiteTitle(metadata?.visibleName)}</title>
       </Helmet>
       <Document
         className={`mx-auto px-4 ${isLoadingDocument ? 'flex items-center' : ''}`}

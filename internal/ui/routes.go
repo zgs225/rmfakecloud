@@ -57,13 +57,13 @@ func (app *ReactAppWrapper) RegisterRoutes(router *gin.Engine) {
 	auth.GET("documents", app.listDocuments)
 	auth.GET("documents/:docid", app.getDocument)
 	auth.POST("documents/upload", app.createDocument)
-	auth.DELETE("documents/:docid", app.deleteDocument)
-	//move, rename
-	auth.PUT("documents/:docid", app.updateDocument)
-	auth.GET("documents/:docid/metadata", app.getDocumentMetadata)
 
-	// folders
+	//move, rename
+	auth.DELETE("documents/:docid", app.deleteDocument)
+	auth.PUT("documents", app.updateDocument)
+	auth.PUT("documents/:docid", app.updateDocument)
 	auth.POST("folders", app.createFolder)
+	auth.GET("documents/:docid/metadata", app.getDocumentMetadata)
 
 	//admin
 	admin := auth.Group("")

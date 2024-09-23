@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -61,20 +60,20 @@ func FileHashAndSize(file string) ([]byte, int64, error) {
 	return h, size, err
 }
 
-// LoadTree loads
+// LoadTree loads a cached tree to avoid parsing all the blobs
 func LoadTree(cacheFile string) (*HashTree, error) {
 	tree := HashTree{}
 	if _, err := os.Stat(cacheFile); err == nil {
-		b, err := ioutil.ReadFile(cacheFile)
+		b, err := os.ReadFile(cacheFile)
 		if err != nil {
 			return nil, err
 		}
 		err = json.Unmarshal(b, &tree)
 		if err != nil {
-			log.Println("cache corrupt")
-			return nil, err
+			log.Warn("cached tree corrupt, returning empty tree")
+			return &HashTree{}, nil
 		}
-		log.Println("Cache loaded: ", cacheFile)
+		log.Info("cached tree loaded: ", cacheFile)
 	}
 
 	return &tree, nil
@@ -96,7 +95,7 @@ func parseEntry(line string) (*HashEntry, error) {
 	rdr := NewFieldReader(line)
 	numFields := len(rdr.fields)
 	if numFields != 5 {
-		return nil, fmt.Errorf("wrong number of fields %d", numFields)
+		return nil, fmt.Errorf("parseEntry: wrong number of fields %d", numFields)
 	}
 	var err error
 	entry.Hash, err = rdr.Next()
@@ -130,14 +129,14 @@ func parseEntry(line string) (*HashEntry, error) {
 	return &entry, nil
 }
 
-func parseIndex(f io.Reader) ([]*HashEntry, error) {
+func parseIndex(r io.Reader) ([]*HashEntry, error) {
 	var entries []*HashEntry
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(r)
 	scanner.Scan()
 	schema := scanner.Text()
 
 	if schema != schemaVersion {
-		return nil, errors.New("wrong schema")
+		return nil, fmt.Errorf("parseInde unknown schema: %s", schema)
 	}
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -184,7 +183,7 @@ func (t *HashTree) FindDoc(documentID string) (*HashDoc, error) {
 			return d, nil
 		}
 	}
-	return nil, fmt.Errorf("doc %s not found", documentID)
+	return nil, fmt.Errorf("treedoc '%s' not found", documentID)
 }
 
 // Remove removes
@@ -218,7 +217,7 @@ func (t *HashTree) Rehash() error {
 	if err != nil {
 		return err
 	}
-	log.Println("New root hash: ", hash)
+	log.Debug("New root hash: ", hash)
 	t.Hash = hash
 	return nil
 }
@@ -226,13 +225,14 @@ func (t *HashTree) Rehash() error {
 // Mirror makes the tree look like the storage
 func (t *HashTree) Mirror(r RemoteStorage) (changed bool, err error) {
 	rootHash, gen, err := r.GetRootIndex()
+	log.Debug("got root ", rootHash, gen, err)
 	if err != nil {
 		return
 	}
-	if rootHash == "" && gen == 0 {
-		log.Println("Empty cloud")
+	if rootHash == "" {
+		log.Warn("empty root hash, empty cloud?")
 		t.Docs = nil
-		t.Generation = 0
+		t.Generation = gen
 		return
 	}
 
@@ -243,7 +243,7 @@ func (t *HashTree) Mirror(r RemoteStorage) (changed bool, err error) {
 		}
 		return
 	}
-	log.Printf("remote root hash different")
+	log.Debug("remote root hash different is different")
 
 	rdr, err := r.GetReader(rootHash)
 	if err != nil {
@@ -267,21 +267,27 @@ func (t *HashTree) Mirror(r RemoteStorage) (changed bool, err error) {
 		if entry, ok := new[doc.HashEntry.EntryName]; ok {
 			//hash different update
 			if entry.Hash != doc.Hash {
-				log.Println("doc updated: " + doc.EntryName)
+				log.Info("doc updated: ", doc.EntryName)
 				doc.Mirror(entry, r)
+			}
+			if doc.Deleted {
+				continue
 			}
 			head = append(head, doc)
 			current[doc.EntryName] = doc
 		}
-
 	}
 
 	//find new entries
 	for k, newEntry := range new {
 		if _, ok := current[k]; !ok {
 			doc := &HashDoc{}
-			log.Println("doc new: " + k)
+			log.Info("doc new: ", k)
 			doc.Mirror(newEntry, r)
+
+			if doc.Deleted {
+				continue
+			}
 			head = append(head, doc)
 		}
 	}
@@ -294,37 +300,47 @@ func (t *HashTree) Mirror(r RemoteStorage) (changed bool, err error) {
 
 // BuildTree from remote storage
 func BuildTree(provider RemoteStorage) (*HashTree, error) {
-	tree := HashTree{}
-
 	rootHash, gen, err := provider.GetRootIndex()
 
 	if err != nil {
 		return nil, err
 	}
-	tree.Hash = rootHash
-	tree.Generation = gen
 
 	rootIndex, err := provider.GetReader(rootHash)
 	if err != nil {
 		return nil, err
 	}
-
 	defer rootIndex.Close()
-	entries, _ := parseIndex(rootIndex)
+
+	return buildTreeFromFile(provider, rootIndex, rootHash, gen)
+}
+
+func buildTreeFromFile(provider RemoteStorage, rootFile io.Reader, rootHash string, gen int64) (*HashTree, error) {
+	entries, _ := parseIndex(rootFile)
+
+	tree := HashTree{}
+
+	tree.Hash = rootHash
+	tree.Generation = gen
 
 	for _, e := range entries {
-		f, _ := provider.GetReader(e.Hash)
-		defer f.Close()
+		r, _ := provider.GetReader(e.Hash)
+		defer r.Close()
 
 		doc := &HashDoc{}
 		doc.HashEntry = *e
-		tree.Docs = append(tree.Docs, doc)
 
-		items, _ := parseIndex(f)
+		items, _ := parseIndex(r)
 		doc.Files = items
 		for _, i := range items {
 			doc.ReadMetadata(i, provider)
 		}
+
+		if doc.Deleted {
+			continue
+		}
+		tree.Docs = append(tree.Docs, doc)
+
 	}
 
 	return &tree, nil

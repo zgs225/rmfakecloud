@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ddvk/rmfakecloud/internal/common"
 	"github.com/ddvk/rmfakecloud/internal/messages"
 	"github.com/ddvk/rmfakecloud/internal/storage"
-	"github.com/ddvk/rmfakecloud/internal/storage/models"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -65,9 +65,9 @@ func extractID(r io.Reader) (string, error) {
 func (fs *FileSystemStorage) CreateDocument(uid, filename, parent string, stream io.Reader) (doc *storage.Document, err error) {
 	ext := path.Ext(filename)
 	switch ext {
-	case models.PdfFileExt:
+	case storage.PdfFileExt:
 		fallthrough
-	case models.EpubFileExt:
+	case storage.EpubFileExt:
 	default:
 		return nil, errors.New("unsupported extension: " + ext)
 	}
@@ -75,14 +75,14 @@ func (fs *FileSystemStorage) CreateDocument(uid, filename, parent string, stream
 	var docid string
 
 	var isZip = false
-	if ext == models.ZipFileExt {
+	if ext == storage.ZipFileExt {
 		docid, err = extractID(stream)
 		isZip = true
 	} else {
 		docid = uuid.New().String()
 	}
 	//create zip from pdf
-	zipfile := fs.getPathFromUser(uid, docid+models.ZipFileExt)
+	zipfile := fs.getPathFromUser(uid, docid+storage.ZipFileExt)
 	file, err := os.Create(zipfile)
 	if err != nil {
 		return
@@ -105,13 +105,13 @@ func (fs *FileSystemStorage) CreateDocument(uid, filename, parent string, stream
 			return
 		}
 
-		entry, err = w.Create(docid + models.PageFileExt)
+		entry, err = w.Create(docid + storage.PageFileExt)
 		if err != nil {
 			return
 		}
 		entry.Write([]byte{})
 
-		entry, err = w.Create(docid + models.ContentFileExt)
+		entry, err = w.Create(docid + storage.ContentFileExt)
 		if err != nil {
 			return
 		}
@@ -128,33 +128,33 @@ func (fs *FileSystemStorage) CreateDocument(uid, filename, parent string, stream
 
 	//create metadata
 	name := strings.TrimSuffix(filename, ext)
-	doc1 := createRawMedatadata(docid, name, parent)
+	rawMetadata := createRawMedatadata(docid, name, parent, common.DocumentType)
 
-	jsn, err := json.Marshal(doc1)
+	jsn, err := json.Marshal(rawMetadata)
 	if err != nil {
 		return
 	}
 
 	doc = &storage.Document{
 		ID:      docid,
-		Type:    doc1.Type,
+		Type:    rawMetadata.Type,
 		Name:    name,
 		Version: 1,
 	}
 	//save metadata
-	metafilePath := fs.getPathFromUser(uid, docid+models.MetadataFileExt)
+	metafilePath := fs.getPathFromUser(uid, docid+storage.MetadataFileExt)
 	err = ioutil.WriteFile(metafilePath, jsn, 0600)
 	return
 }
 
-func createRawMedatadata(id, name, parent string) *messages.RawMetadata {
+func createRawMedatadata(id, name, parent string, entryType common.EntryType) *messages.RawMetadata {
 	doc := messages.RawMetadata{
 		ID:             id,
 		VissibleName:   name,
 		Version:        1,
 		ModifiedClient: time.Now().UTC().Format(time.RFC3339Nano),
 		CurrentPage:    0,
-		Type:           models.DocumentType,
+		Type:           entryType,
 		Parent:         parent,
 	}
 	return &doc

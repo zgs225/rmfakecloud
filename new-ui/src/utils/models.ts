@@ -18,25 +18,24 @@ export interface HashDoc {
   extension?: string
   parent?: string
   children?: HashDoc[]
-  LastModified: string
+  lastModified: string
 
   preMode?: HashDocMode
   mode?: HashDocMode
 }
 
 export interface HashDocMetadata {
-  ID: string
-  Type: HashDocType
-  VissibleName: string
-  Version?: number
-  Message?: string
-  Success?: boolean
-  BlobURLGet?: string
-  BlobURLGetExpires?: string
-  ModifiedClient: string
-  CurrentPage?: number
-  Bookmarked?: boolean
-  Parent?: string
+  visibleName: string
+  type: HashDocType
+  parent: string
+  lastModified: string
+  lastOpened: string
+  version: number
+  pinned: boolean
+  synced: boolean
+  modified: boolean
+  deleted: boolean
+  metadatamodified: boolean
 }
 
 export interface AppUser {

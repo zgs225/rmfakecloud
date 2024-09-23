@@ -52,7 +52,7 @@ class ApiServices {
   }
 
   resetPassword(resetPasswordForm) {
-    return fetch(`${constants.ROOT_URL}/resetPassword`, {
+    return fetch(`${constants.ROOT_URL}/changePassword`, {
       method: "POST",
       headers: this.header(),
       body: JSON.stringify({
@@ -128,4 +128,5 @@ function handleError(r) {
     }
 }
 
-export default new ApiServices()
+const apiServices = new ApiServices()
+export default apiServices

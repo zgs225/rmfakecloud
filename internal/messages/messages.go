@@ -1,6 +1,23 @@
 package messages
 
-import "time"
+import (
+	"time"
+
+	"github.com/ddvk/rmfakecloud/internal/common"
+)
+
+// NotificationType type of the notifiction
+type NotificationType string
+
+const (
+	//DocAddedEvent addded
+	DocAddedEvent NotificationType = "DocAdded"
+	//DocDeletedEvent deleted
+	DocDeletedEvent NotificationType = "DocDeleted"
+
+	//SyncCompletedEvent sync completed sync15
+	SyncCompletedEvent NotificationType = "SyncComplete"
+)
 
 // BlobStorageRequest else
 type BlobStorageRequest struct {
@@ -11,10 +28,11 @@ type BlobStorageRequest struct {
 
 // BlobStorageResponse  what else
 type BlobStorageResponse struct {
-	Expires      string `json:"expires"`
-	Method       string `json:"method"`
-	RelativePath string `json:"relative_path"`
-	URL          string `json:"url"`
+	Expires        string `json:"expires"`
+	Method         string `json:"method"`
+	RelativePath   string `json:"relative_path"`
+	URL            string `json:"url"`
+	MaxRequestSize int64  `json:"maxuploadsize_bytes,omitempty"`
 }
 
 // StatusResponse what else
@@ -43,32 +61,32 @@ type NotificationMessage struct {
 
 // Attributes child object
 type Attributes struct {
-	Auth0UserID      string `json:"auth0UserID"`
-	Bookmarked       bool   `json:"bookmarked,omitempty"`
-	Event            string `json:"event"`
-	ID               string `json:"id,omitempty"`
-	Parent           string `json:"parent,omitempty"`
-	SourceDeviceDesc string `json:"sourceDeviceDesc"`
-	SourceDeviceID   string `json:"sourceDeviceID"`
-	Type             string `json:"type,omitempty"`
-	Version          string `json:"version,omitempty"`
-	VissibleName     string `json:"vissibleName,omitempty"`
+	Auth0UserID      string           `json:"auth0UserID"`
+	Bookmarked       bool             `json:"bookmarked,omitempty"`
+	Event            NotificationType `json:"event"`
+	ID               string           `json:"id,omitempty"`
+	Parent           string           `json:"parent,omitempty"`
+	SourceDeviceDesc string           `json:"sourceDeviceDesc"`
+	SourceDeviceID   string           `json:"sourceDeviceID"`
+	Type             common.EntryType `json:"type,omitempty"`
+	Version          string           `json:"version,omitempty"`
+	VissibleName     string           `json:"vissibleName,omitempty"`
 }
 
-// RawMetadata just a raw document
+// RawMetadata just a raw document, used by the legacy api
 type RawMetadata struct {
-	ID                string `json:"ID"`
-	Version           int    `json:"Version"`
-	Message           string `json:"Message"`
-	Success           bool   `json:"Success"`
-	BlobURLGet        string `json:"BlobURLGet"`
-	BlobURLGetExpires string `json:"BlobURLGetExpires"`
-	ModifiedClient    string `json:"ModifiedClient"`
-	Type              string `json:"Type"`
-	VissibleName      string `json:"VissibleName"`
-	CurrentPage       int    `json:"CurrentPage"`
-	Bookmarked        bool   `json:"Bookmarked"`
-	Parent            string `json:"Parent"`
+	ID                string           `json:"ID"`
+	Version           int              `json:"Version"`
+	Message           string           `json:"Message"`
+	Success           bool             `json:"Success"`
+	BlobURLGet        string           `json:"BlobURLGet"`
+	BlobURLGetExpires string           `json:"BlobURLGetExpires"`
+	ModifiedClient    string           `json:"ModifiedClient"`
+	Type              common.EntryType `json:"Type"`
+	VissibleName      string           `json:"VissibleName"`
+	CurrentPage       int              `json:"CurrentPage"`
+	Bookmarked        bool             `json:"Bookmarked"`
+	Parent            string           `json:"Parent"`
 
 	// For distinguish file type at file tree, don't dump to disk
 	Extension string `json:"-"`
@@ -112,13 +130,41 @@ type DeviceTokenRequest struct {
 
 // SyncCompleted sync ended
 type SyncCompleted struct {
-	ID string `json:"id"`
+	ID         string `json:"id"`
+	Generation int64  `json:"generation"`
+}
+
+// SyncCompleted sync ended
+type SyncCompletedRequestV2 struct {
+	Generation int64 `json:"generation"`
+}
+
+// SyncRootV3
+type SyncRootV3 struct {
+	Generation int64  `json:"generation"`
+	Hash       string `json:"hash,omitempty"`
+}
+
+type CheckFiles struct {
+	Filename string   `json:"filename"`
+	Files    []string `json:"files"`
+	Reason   string   `json:"reason"`
+}
+
+type MissingFiles struct {
+	MissingFiles []string `json:"missingFiles"`
+}
+
+type MissingHashes struct {
+	Hashes []string `json:"hashes"`
 }
 
 // IntegrationsResponse integrations
 type IntegrationsResponse struct {
 	Integrations []Integration `json:"integrations"`
 }
+
+// Integration integrations (google,dropbox)
 type Integration struct {
 	Added    time.Time `json:"added"`
 	ID       string    `json:"id"`

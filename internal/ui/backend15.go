@@ -5,11 +5,10 @@ import (
 	"io"
 
 	"github.com/ddvk/rmfakecloud/internal/app/hub"
+	"github.com/ddvk/rmfakecloud/internal/common"
 	"github.com/ddvk/rmfakecloud/internal/storage"
-	"github.com/ddvk/rmfakecloud/internal/storage/models"
 	"github.com/ddvk/rmfakecloud/internal/ui/viewmodel"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 type backend15 struct {
@@ -18,7 +17,7 @@ type backend15 struct {
 }
 
 func (b *backend15) GetDocumentTree(uid string) (tree *viewmodel.DocumentTree, err error) {
-	hashTree, err := b.blobHandler.GetTree(uid)
+	hashTree, err := b.blobHandler.GetCachedTree(uid)
 	if err != nil {
 		return nil, err
 	}
@@ -35,54 +34,18 @@ func (b *backend15) CreateDocument(uid, filename, parent string, stream io.Reade
 	return
 }
 
-func (d *backend15) DeleteDocument(uid, docid string) error {
-	tree, err := d.blobHandler.GetTree(uid)
-
-	if err != nil {
-		return err
-	}
-
-	hashDoc, err := tree.FindDoc(docid)
-
-	if err != nil {
-		return err
-	}
-
-	md := hashDoc.MetadataFile
-
-	// Confirm no child before remove a folder
-	if md.CollectionType == models.CollectionType {
-		docTree := viewmodel.DocTreeFromHashTree(tree)
-
-		// O(n)
-		for _, entry := range docTree.Entries {
-			dir, ok := entry.(*viewmodel.Directory)
-			if !ok {
-				continue
-			}
-			if dir.ID == docid {
-				if len(dir.Entries) > 0 {
-					return errors.New("Can't remove non-empty folder")
-				}
-			}
-		}
-	}
-
-	md.Parent = viewmodel.TrashID
-
-	if err := d.blobHandler.UpdateBlobMetadata(uid, docid, &md); err != nil {
-		return err
-	}
-
-	return nil
+func (b *backend15) UpdateDocument(uid, docID, name, parent string) (err error) {
+	return b.blobHandler.UpdateBlobDocument(uid, docID, name, parent)
+}
+func (b *backend15) CreateFolder(uid, name, parent string) (doc *storage.Document, err error) {
+	return b.blobHandler.CreateBlobFolder(uid, name, parent)
 }
 
-func (d *backend15) CreateFolder(uid, name, parent string) (*storage.Document, error) {
-	return d.blobHandler.CreateBlobFolder(uid, name, parent)
+func (b *backend15) DeleteDocument(uid, docID string) (err error) {
+	return b.blobHandler.DeleteBlobDocument(uid, docID)
 }
 
 func (b *backend15) Sync(uid string) {
-	logrus.Info("notifying")
 	b.h.NotifySync(uid, uuid.NewString())
 }
 
@@ -117,7 +80,7 @@ func (d *backend15) MoveDocument(uid, docId, newParent string) (bool, error) {
 		return false, err
 	}
 
-	if parentMD.CollectionType != models.CollectionType {
+	if parentMD.CollectionType != common.CollectionType {
 		return false, errors.New("Parent is not a folder")
 	}
 
@@ -138,4 +101,8 @@ func (d *backend15) MoveDocument(uid, docId, newParent string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (d *backend15) GetMetadata(uid, docId string) (*common.MetadataFile, error) {
+	return d.blobHandler.GetBlobMetadata(uid, docId)
 }

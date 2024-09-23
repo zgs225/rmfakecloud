@@ -3,24 +3,55 @@ package ui
 import (
 	"errors"
 	"io"
+	"time"
 
 	"github.com/ddvk/rmfakecloud/internal/app/hub"
+	"github.com/ddvk/rmfakecloud/internal/common"
+	"github.com/ddvk/rmfakecloud/internal/messages"
 	"github.com/ddvk/rmfakecloud/internal/storage"
-	"github.com/ddvk/rmfakecloud/internal/storage/models"
 	"github.com/ddvk/rmfakecloud/internal/ui/viewmodel"
 	log "github.com/sirupsen/logrus"
 )
 
+const webDevice = "web"
+
 type backend10 struct {
 	documentHandler documentHandler
 	metadataStore   storage.MetadataStorer
-	h               *hub.Hub
+	hub             *hub.Hub
 }
 
 func (d *backend10) Sync(uid string) {
-
+	//nop
 }
 
+func (d *backend10) CreateFolder(uid, filename, parent string) (doc *storage.Document, err error) {
+	if len(parent) > 0 {
+		md, err := d.metadataStore.GetMetadata(uid, parent)
+		if err != nil {
+			return nil, err
+		}
+		if md.Type != common.CollectionType {
+			return nil, errors.New("Parent is not a folder")
+		}
+	}
+
+	doc, err = d.documentHandler.CreateFolder(uid, filename, parent)
+	if err != nil {
+		return
+	}
+
+	ntf := hub.DocumentNotification{
+		ID:      doc.ID,
+		Type:    common.CollectionType,
+		Version: 1,
+		Parent:  parent,
+		Name:    doc.Name,
+	}
+	log.Info(uiLogger, "created folder", doc.ID)
+	d.hub.Notify(uid, webDevice, ntf, messages.DocAddedEvent)
+	return
+}
 func (d *backend10) CreateDocument(uid, filename, parent string, stream io.Reader) (doc *storage.Document, err error) {
 	doc, err = d.documentHandler.CreateDocument(uid, filename, parent, stream)
 	if err != nil {
@@ -29,13 +60,13 @@ func (d *backend10) CreateDocument(uid, filename, parent string, stream io.Reade
 
 	ntf := hub.DocumentNotification{
 		ID:      doc.ID,
-		Type:    models.DocumentType,
+		Type:    common.DocumentType,
 		Version: 1,
 		Parent:  parent,
 		Name:    doc.Name,
 	}
-	log.Info(uiLogger, "Uploaded document id", doc.ID)
-	d.h.Notify(uid, "web", ntf, hub.DocAddedEvent)
+	log.Info(uiLogger, ui10, "Uploaded document id", doc.ID)
+	d.hub.Notify(uid, webDevice, ntf, messages.DocAddedEvent)
 	return
 }
 
@@ -47,7 +78,7 @@ func (d *backend10) DeleteDocument(uid, docid string) error {
 	}
 
 	// Check if document is folder, it must be empty
-	if meta.Type == models.CollectionType {
+	if meta.Type == common.CollectionType {
 		tree, err := d.GetDocumentTree(uid)
 		if err != nil {
 			return err
@@ -78,7 +109,7 @@ func (d *backend10) DeleteDocument(uid, docid string) error {
 		Name:    meta.VissibleName,
 	}
 	log.Info(uiLogger, "Document deleted: id=", meta.ID, " name=", meta.VissibleName)
-	d.h.Notify(uid, "web", ntf, hub.DocDeletedEvent)
+	d.hub.Notify(uid, "web", ntf, messages.DocDeletedEvent)
 	return nil
 }
 
@@ -87,25 +118,58 @@ func (d *backend10) GetDocumentTree(uid string) (tree *viewmodel.DocumentTree, e
 	if err != nil {
 		return nil, err
 	}
-
-	return viewmodel.DocTreeFromRawMetadata(documents), nil
-}
-func (d *backend10) Export(uid, doc, exporttype string, opt storage.ExportOption) (stream io.ReadCloser, err error) {
-	return d.documentHandler.ExportDocument(uid, doc, exporttype, opt)
-}
-
-func (d *backend10) CreateFolder(uid, name, parent string) (*storage.Document, error) {
-	if len(parent) > 0 {
-		md, err := d.metadataStore.GetMetadata(uid, parent)
+	docs := make([]*viewmodel.InternalDoc, 0)
+	for _, d := range documents {
+		lastMod, err := time.Parse(time.RFC3339Nano, d.ModifiedClient)
 		if err != nil {
-			return nil, err
+			log.Warn("incorrect time for: ", d.VissibleName, " value: ", lastMod)
 		}
-		if md.Type != models.CollectionType {
-			return nil, errors.New("Parent is not a folder")
-		}
+		docs = append(docs, &viewmodel.InternalDoc{
+			ID:           d.ID,
+			Parent:       d.Parent,
+			Name:         d.VissibleName,
+			Type:         d.Type,
+			FileType:     "TODO",
+			LastModified: lastMod,
+		})
+
+	}
+	return viewmodel.DocTreeFromRawMetadata(docs), nil
+}
+func (d *backend10) Export(uid, docID, exporttype string, opt storage.ExportOption) (stream io.ReadCloser, err error) {
+	r, err := d.documentHandler.ExportDocument(uid, docID, exporttype, opt)
+	if err != nil {
+		return nil, err
+	}
+	log.Info(uiLogger, ui10, "Exported document id: ", docID)
+	return r, nil
+}
+
+func (d *backend10) UpdateDocument(uid, docID, name, parent string) (err error) {
+	metadata, err := d.documentHandler.GetMetadata(uid, docID)
+	if err != nil {
+		return err
+	}
+	metadata.VissibleName = name
+	metadata.Parent = parent
+	metadata.Version++
+
+	err = d.documentHandler.UpdateMetadata(uid, metadata)
+	if err != nil {
+		return err
+	}
+	ntf := hub.DocumentNotification{
+		ID:      docID,
+		Type:    common.DocumentType,
+		Version: metadata.Version,
+		Parent:  parent,
+		Name:    metadata.VissibleName,
 	}
 
-	return d.documentHandler.CreateFolder(uid, name, parent)
+	log.Info(uiLogger, "Updated document id: ", docID)
+	d.hub.Notify(uid, webDevice, ntf, messages.DocAddedEvent)
+	return nil
+
 }
 
 // RenameDocument rename file and folder, the bool type returns value indicates
@@ -140,7 +204,7 @@ func (d *backend10) MoveDocument(uid, docId, newParent string) (bool, error) {
 		return false, err
 	}
 
-	if parentMD.Type != models.CollectionType {
+	if parentMD.Type != common.CollectionType {
 		return false, errors.New("Parent is not a folder")
 	}
 
@@ -162,4 +226,18 @@ func (d *backend10) MoveDocument(uid, docId, newParent string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (d *backend10) GetMetadata(uid, docId string) (*common.MetadataFile, error) {
+	rawMd, err := d.metadataStore.GetMetadata(uid, docId)
+	if err != nil {
+		return nil, err
+	}
+	md := &common.MetadataFile{
+		DocumentName: rawMd.VissibleName,
+		CollectionType: rawMd.Type,
+		Parent: rawMd.Parent,
+		Version: rawMd.Version,
+	}
+	return md, nil
 }

@@ -262,15 +262,13 @@ func (app *ReactAppWrapper) getDocument(c *gin.Context) {
 
 	log.Info("exporting ", docid)
 
-	// TODO(jxg): `users/xendke/6886952c-2b58-4fd6-9960-f08f1327b19c.metadata: no such file or directory`
-	// metadata, err := app.metadataStore.GetMetadata(uid, docid)
-
-	// if err != nil {
-	// 	badReq(c, err.Error())
-	// 	return
-	// }
-
 	backend := app.getBackend(c)
+
+	metadata, err := backend.GetMetadata(uid, docid)
+	if err != nil {
+		badReq(c, err.Error())
+		return
+	}
 
 	reader, err := backend.Export(uid, docid, exportType, exportOption)
 	if err != nil {
@@ -299,13 +297,16 @@ func (app *ReactAppWrapper) getDocument(c *gin.Context) {
 		return
 	}
 
-	c.FileAttachment(tmpFile.Name(), docid+".pdf")
+	c.FileAttachment(tmpFile.Name(), metadata.DocumentName+".pdf")
 }
 
 func (app *ReactAppWrapper) getDocumentMetadata(c *gin.Context) {
 	uid := c.GetString(userIDContextKey)
 	docid := common.ParamS(docIDParam, c)
-	metadata, err := app.metadataStore.GetMetadata(uid, docid)
+
+	backend := app.getBackend(c)
+
+	metadata, err := backend.GetMetadata(uid, docid)
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -370,16 +371,6 @@ func (app *ReactAppWrapper) updateDocument(c *gin.Context) {
 		log.Info(uiLogger, "document updated: id=", docid)
 	}
 
-	// TODO(jxg): old implementation should we keep as separate handler? 
-// 	backend := app.getBackend(c)
-// 	uid := c.GetString(userIDContextKey)
-// 	log.Info(uiLogger, ui10, "updatedoc")
-// 	err := backend.UpdateDocument(uid, upd.DocumentID, upd.Name, upd.ParentID)
-// 	if err != nil {
-// 		badReq(c, err.Error())
-// 		return
-// 	}
-
 	c.Status(http.StatusOK)
 }
 
@@ -395,27 +386,6 @@ func (app *ReactAppWrapper) deleteDocument(c *gin.Context) {
 	backend.Sync(uid)
 	c.Status(http.StatusOK)
 }
-
-// TODO(jxg): old implementation, remove?
-// func (app *ReactAppWrapper) createFolder(c *gin.Context) {
-// 	upd := viewmodel.NewFolder{}
-// 	if err := c.ShouldBindJSON(&upd); err != nil {
-// 		log.Error(err)
-// 		badReq(c, err.Error())
-// 		return
-// 	}
-// 	uid := c.GetString(userIDContextKey)
-
-// 	backend := app.getBackend(c)
-
-// 	doc, err := backend.CreateFolder(uid, upd.Name, upd.ParentID)
-// 	if err != nil {
-// 		log.Error(err)
-// 		c.AbortWithStatus(http.StatusInternalServerError)
-// 		return
-// 	}
-// 	c.JSON(http.StatusOK, doc)
-// }
 
 func (app *ReactAppWrapper) createDocument(c *gin.Context) {
 	uid := c.GetString(userIDContextKey)

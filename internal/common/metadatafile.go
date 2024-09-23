@@ -3,7 +3,7 @@ package common
 // MetadataFile content
 type MetadataFile struct {
 	DocumentName     string           `json:"visibleName"`
-	CollectionType   EntryType `json:"type"`
+	CollectionType   EntryType        `json:"type"`
 	Parent           string           `json:"parent"`
 	LastModified     string           `json:"lastModified"`
 	LastOpened       string           `json:"lastOpened"`

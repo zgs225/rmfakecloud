@@ -61,65 +61,6 @@ func extractID(r io.Reader) (string, error) {
 	return "", nil
 }
 
-// TODO(jxg): already implemented in folder.go. important diffs?
-// func (fs *FileSystemStorage) CreateFolder(uid, name, parent string) (*storage.Document, error) {
-// 	//create metadata
-// 	docID := uuid.New().String()
-// 	metaData := createRawMedatadata(docID, name, parent, common.CollectionType)
-
-// 	jsn, err := json.Marshal(metaData)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	metafilePath := fs.getPathFromUser(uid, docID+storage.MetadataFileExt)
-// 	err = ioutil.WriteFile(metafilePath, jsn, 0600)
-
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	//create zip from pdf
-// 	zipfile := fs.getPathFromUser(uid, docID+storage.ZipFileExt)
-// 	file, err := os.Create(zipfile)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer file.Close()
-
-// 	w := zip.NewWriter(file)
-// 	defer w.Close()
-
-// 	entry, err := w.Create(docID + storage.ContentFileExt)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	emptyContent := `{"tags":[]}`
-// 	_, err = entry.Write([]byte(emptyContent))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	err = w.Close()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	err = file.Close()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	doc := &storage.Document{
-// 		ID:      docID,
-// 		Type:    metaData.Type,
-// 		Name:    name,
-// 		Version: 1,
-// 	}
-// 	//save metadata
-// 	return doc, nil
-// }
-
 // CreateDocument creates a new document
 func (fs *FileSystemStorage) CreateDocument(uid, filename, parent string, stream io.Reader) (doc *storage.Document, err error) {
 	ext := path.Ext(filename)

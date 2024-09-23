@@ -38,26 +38,6 @@ type DocumentTree struct {
 	Trash   []Entry
 }
 
-// TODO(jxg): d.VissibleName probably old can remove this chunk?
-// func makeFolder(d *messages.RawMetadata) (entry *Directory) {
-// 	entry = &Directory{
-// 		ID:   d.ID,
-// 		Name: d.VissibleName,
-// 		// LastModified: d.ModifiedClient,
-// 		Entries: make([]Entry, 0),
-// 	}
-// 	return
-// }
-// func makeDocument(d *messages.RawMetadata) (entry Entry) {
-// 	entry = &Document{
-// 		ID:   d.ID,
-// 		Name: d.VissibleName,
-// 		// LastModified: d.ModifiedClient,
-// 		DocumentType: d.Type,
-// 		Extension:    d.Extension,
-// 	}
-// 	return
-// }
 type InternalDoc struct {
 	ID           string
 	Version      int

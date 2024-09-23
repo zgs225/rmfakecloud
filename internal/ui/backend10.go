@@ -227,3 +227,17 @@ func (d *backend10) MoveDocument(uid, docId, newParent string) (bool, error) {
 
 	return true, nil
 }
+
+func (d *backend10) GetMetadata(uid, docId string) (*common.MetadataFile, error) {
+	rawMd, err := d.metadataStore.GetMetadata(uid, docId)
+	if err != nil {
+		return nil, err
+	}
+	md := &common.MetadataFile{
+		DocumentName: rawMd.VissibleName,
+		CollectionType: rawMd.Type,
+		Parent: rawMd.Parent,
+		Version: rawMd.Version,
+	}
+	return md, nil
+}
